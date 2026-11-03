@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block conteudo %}
+<h1>Consultas de exemplo</h1>
+
+{% for r in resultados %}
+<section class="consulta">
+  <h2>{{ r.titulo }}</h2>
+  <pre class="sql">{{ r.sql }}</pre>
+  {% if r.erro %}
+    <div class="msg erro">{{ r.erro }}</div>
+  {% elif r.linhas %}
+    <div class="tabela">
+    <table>
+      <thead><tr>{% for col in r.linhas[0].keys() %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for linha in r.linhas %}
+        <tr>{% for valor in linha.values() %}
+          <td>{% if valor is number and valor is not integer %}{{ '%.2f'|format(valor) }}{% else %}{{ valor }}{% endif %}</td>
+        {% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  {% else %}
+    <p>Nenhum resultado.</p>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

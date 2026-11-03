@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Imobiliária - Projeto BD</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <a class="logo" href="{{ url_for('inicio') }}">🏠 Imobiliária</a>
+    <nav>
+      {% for chave, ent in entidades.items() %}
+        <a href="{{ url_for('listar', nome=chave) }}"
+           class="{{ 'ativo' if request.view_args and request.view_args.get('nome') == chave }}">{{ ent.titulo }}</a>
+      {% endfor %}
+      <a href="{{ url_for('consultas') }}"
+         class="{{ 'ativo' if request.endpoint == 'consultas' }}">Consultas</a>
+    </nav>
+  </header>
+
+  <main>
+    {% with mensagens = get_flashed_messages(with_categories=true) %}
+      {% for categoria, msg in mensagens %}
+        {% if categoria == 'sql' %}
+          <div class="sql">
+            <strong>SQL executado:</strong>
+            <pre>{{ msg.sql }}</pre>
+            {% if msg.params %}<small>Parâmetros: {{ msg.params }}</small>{% endif %}
+          </div>
+        {% else %}
+          <div class="msg {{ categoria }}">{{ msg }}</div>
+        {% endif %}
+      {% endfor %}
+    {% endwith %}
+
+    {% block conteudo %}{% endblock %}
+  </main>
+</body>
+</html>

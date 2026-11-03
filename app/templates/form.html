@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block conteudo %}
+<h1>{{ 'Editar' if editando else 'Novo' }} — {{ ent.titulo }}</h1>
+
+<form method="post" class="formulario">
+  {% for c in ent.campos %}
+    {% set valor = registro.get(c.nome) %}
+    {% set travado = editando and c.nome in ent.pk %}
+    <label>
+      {% if c.tipo == 'bool' %}
+        <span class="check">
+          <input type="checkbox" name="{{ c.nome }}" {{ 'checked' if valor }}> {{ c.rotulo }}
+        </span>
+      {% else %}
+        <span>{{ c.rotulo }} *</span>
+        {% if c.tipo == 'select' %}
+          <select name="{{ c.nome }}" required>
+            <option value="">Selecione...</option>
+            {% for op in c.opcoes %}
+              <option {{ 'selected' if op == valor }}>{{ op }}</option>
+            {% endfor %}
+          </select>
+        {% elif c.tipo == 'fk' %}
+          <select name="{{ c.nome }}" required>
+            <option value="">Selecione...</option>
+            {% for op in opcoes[c.nome] %}
+              <option value="{{ op.valor }}" {{ 'selected' if op.valor|string == valor|string }}>{{ op.rotulo }}</option>
+            {% endfor %}
+          </select>
+        {% else %}
+          <input type="{{ 'number' if c.tipo in ('int', 'number') else c.tipo }}" name="{{ c.nome }}"
+                 value="{{ valor if valor is not none else '' }}"
+                 {{ 'step=0.01' if c.tipo == 'number' }} required {{ 'readonly' if travado }}>
+        {% endif %}
+      {% endif %}
+    </label>
+  {% endfor %}
+
+  <div class="botoes">
+    <button class="botao">Salvar</button>
+    <a href="{{ url_for('listar', nome=nome) }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

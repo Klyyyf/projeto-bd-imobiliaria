@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block conteudo %}
+<div class="topo">
+  <h1>{{ ent.titulo }}</h1>
+  <a class="botao" href="{{ url_for('criar', nome=nome) }}">+ Novo</a>
+</div>
+
+{% if linhas %}
+<div class="tabela">
+<table>
+  <thead>
+    <tr>
+      {% for col in linhas[0].keys() %}<th>{{ col }}</th>{% endfor %}
+      <th>Ações</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for linha in linhas %}
+    <tr>
+      {% for col, valor in linha.items() %}
+        <td>
+          {% if valor is none %}—
+          {% elif valor is number and valor is not integer %}{{ '%.2f'|format(valor) }}
+          {% else %}{{ valor }}{% endif %}
+        </td>
+      {% endfor %}
+      {% set chave = chave_da_linha(ent, linha) %}
+      <td class="acoes">
+        {% if ent.get('editavel', true) %}<a href="{{ url_for('editar', nome=nome, chave=chave) }}">Editar</a>{% endif %}
+        <form method="post" action="{{ url_for('excluir', nome=nome, chave=chave) }}"
+              onsubmit="return confirm('Excluir este registro?')">
+          <button class="link-perigo">Excluir</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p>Nenhum registro cadastrado.</p>
+{% endif %}
+
+<details class="sql">
+  <summary>Ver SQL da listagem</summary>
+  <pre>{{ sql_lista }}</pre>
+</details>
+{% endblock %}

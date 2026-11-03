@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block conteudo %}
+<h1>Sistema de Imobiliária</h1>
+<p>Aplicação de demonstração do Projeto de Banco de Dados (SQLite).</p>
+
+<div class="cards">
+  {% for chave, ent in entidades.items() %}
+    <a class="card" href="{{ url_for('listar', nome=chave) }}">
+      <span class="numero">{{ totais[chave] }}</span>
+      <span>{{ ent.titulo }}</span>
+    </a>
+  {% endfor %}
+</div>
+{% endblock %}
