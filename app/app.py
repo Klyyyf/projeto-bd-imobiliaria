@@ -25,12 +25,16 @@ app.secret_key = "projeto-bd"
 # Mapeamento das tabelas do esquema (sql/01_criacao.sql)
 # --------------------------------------------------------------------------
 TIPOS_IMOVEL = ["Casa", "Apartamento", "Escritório", "Comércio"]
+STATUS_IMOVEL = ["Disponível", "Reservado", "Vendido"]
 
 OPCOES_CLIENTE = "SELECT cpf AS valor, nome || ' (' || cpf || ')' AS rotulo FROM Cliente ORDER BY nome"
 OPCOES_PROPRIETARIO = "SELECT cpf AS valor, nome || ' (' || cpf || ')' AS rotulo FROM Proprietario ORDER BY nome"
 OPCOES_CORRETOR = "SELECT creci AS valor, nome || ' (' || creci || ')' AS rotulo FROM Corretor ORDER BY nome"
 OPCOES_IMOVEL = ("SELECT id_imovel AS valor, '#' || id_imovel || ' - ' || tipo || ', ' || rua || ', ' || numero"
-                 " AS rotulo FROM Imovel ORDER BY id_imovel")
+                 " || ' (' || status || ')' AS rotulo FROM Imovel ORDER BY id_imovel")
+# Na venda só aparecem imóveis disponíveis (mais o já escolhido, ao editar)
+OPCOES_IMOVEL_VENDA = ("SELECT id_imovel AS valor, '#' || id_imovel || ' - ' || tipo || ', ' || rua || ', ' || numero"
+                       " AS rotulo FROM Imovel WHERE status = 'Disponível' OR id_imovel = :atual ORDER BY id_imovel")
 
 ENTIDADES = {
     "clientes": {
@@ -75,6 +79,7 @@ ENTIDADES = {
         "pk_auto": True,
         "campos": [
             {"nome": "tipo", "rotulo": "Tipo", "tipo": "select", "opcoes": TIPOS_IMOVEL},
+            {"nome": "status", "rotulo": "Status", "tipo": "select", "opcoes": STATUS_IMOVEL},
             {"nome": "rua", "rotulo": "Rua", "tipo": "text"},
             {"nome": "numero", "rotulo": "Número", "tipo": "int"},
             {"nome": "bairro", "rotulo": "Bairro", "tipo": "text"},
@@ -84,7 +89,7 @@ ENTIDADES = {
             {"nome": "cpf_proprietario", "rotulo": "Proprietário", "tipo": "fk", "sql_opcoes": OPCOES_PROPRIETARIO},
         ],
         "sql_lista": """
-            SELECT i.id_imovel, i.tipo, i.rua, i.numero, i.bairro, i.cidade, i.cep, i.preco,
+            SELECT i.id_imovel, i.tipo, i.status, i.rua, i.numero, i.bairro, i.cidade, i.cep, i.preco,
                    p.nome AS proprietario
             FROM Imovel i
             JOIN Proprietario p ON p.cpf = i.cpf_proprietario
@@ -95,8 +100,14 @@ ENTIDADES = {
         "tabela": "Venda",
         "pk": ["id_venda"],
         "pk_auto": True,
+        "fixos": ["id_imovel"],  # o imóvel da venda não muda na edição
+        # Ao vender, o imóvel passa a 'Vendido'; ao excluir a venda, volta a 'Disponível'
+        "apos_inserir": "UPDATE Imovel SET status = 'Vendido' WHERE id_imovel = :id_imovel",
+        "antes_excluir": """
+            UPDATE Imovel SET status = 'Disponível'
+            WHERE id_imovel = (SELECT id_imovel FROM Venda WHERE id_venda = :pk_id_venda)""",
         "campos": [
-            {"nome": "id_imovel", "rotulo": "Imóvel", "tipo": "fk", "sql_opcoes": OPCOES_IMOVEL},
+            {"nome": "id_imovel", "rotulo": "Imóvel", "tipo": "fk", "sql_opcoes": OPCOES_IMOVEL_VENDA},
             {"nome": "cpf_cliente", "rotulo": "Cliente (comprador)", "tipo": "fk", "sql_opcoes": OPCOES_CLIENTE},
             {"nome": "creci_corretor", "rotulo": "Corretor", "tipo": "fk", "sql_opcoes": OPCOES_CORRETOR},
             {"nome": "valor_venda", "rotulo": "Valor da venda (R$)", "tipo": "number"},
@@ -111,6 +122,27 @@ ENTIDADES = {
             JOIN Cliente c    ON c.cpf = v.cpf_cliente
             JOIN Corretor cor ON cor.creci = v.creci_corretor
             ORDER BY v.id_venda""",
+    },
+    "visitas": {
+        "titulo": "Visitas",
+        "tabela": "Visita",
+        "pk": ["id_visita"],
+        "pk_auto": True,
+        "campos": [
+            {"nome": "id_imovel", "rotulo": "Imóvel", "tipo": "fk", "sql_opcoes": OPCOES_IMOVEL},
+            {"nome": "cpf_cliente", "rotulo": "Cliente", "tipo": "fk", "sql_opcoes": OPCOES_CLIENTE},
+            {"nome": "creci_corretor", "rotulo": "Corretor", "tipo": "fk", "sql_opcoes": OPCOES_CORRETOR},
+            {"nome": "data_visita", "rotulo": "Data da visita", "tipo": "date"},
+            {"nome": "feedback", "rotulo": "Feedback", "tipo": "text", "opcional": True},
+        ],
+        "sql_lista": """
+            SELECT vi.id_visita, vi.data_visita, i.tipo || ', ' || i.rua AS imovel,
+                   c.nome AS cliente, cor.nome AS corretor, vi.feedback
+            FROM Visita vi
+            JOIN Imovel i     ON i.id_imovel = vi.id_imovel
+            JOIN Cliente c    ON c.cpf = vi.cpf_cliente
+            JOIN Corretor cor ON cor.creci = vi.creci_corretor
+            ORDER BY vi.data_visita DESC""",
     },
     "contratacoes": {
         "titulo": "Contratações",
@@ -161,11 +193,20 @@ def conectar():
 
 def executar(sql, params=None, mostrar=True):
     """Executa um comando SQL e, se `mostrar`, exibe-o na próxima página."""
-    sql = " ".join(sql.split())
+    return executar_transacao([(sql, params)], mostrar)
+
+
+def executar_transacao(comandos, mostrar=True):
+    """Executa vários comandos numa única transação (tudo ou nada)."""
+    executados, linhas = [], []
     with conectar() as conn:
-        linhas = [dict(l) for l in conn.execute(sql, params or {}).fetchall()]
+        for sql, params in comandos:
+            sql = " ".join(sql.split())
+            linhas = [dict(l) for l in conn.execute(sql, params or {}).fetchall()]
+            executados.append({"sql": sql, "params": params or {}})
     if mostrar:
-        flash({"sql": sql, "params": params or {}}, "sql")
+        for comando in executados:
+            flash(comando, "sql")
     return linhas
 
 
@@ -222,9 +263,9 @@ def ler_formulario(ent):
     return valores
 
 
-def opcoes_fk(ent):
+def opcoes_fk(ent, registro):
     return {
-        c["nome"]: executar(c["sql_opcoes"], mostrar=False)
+        c["nome"]: executar(c["sql_opcoes"], {"atual": registro.get(c["nome"])}, mostrar=False)
         for c in ent["campos"] if c["tipo"] == "fk"
     }
 
@@ -263,14 +304,17 @@ def criar(nome):
         registro = ler_formulario(ent)
         colunas = ", ".join(registro)
         marcadores = ", ".join(f":{c}" for c in registro)
+        comandos = [(f"INSERT INTO {ent['tabela']} ({colunas}) VALUES ({marcadores})", registro)]
+        if ent.get("apos_inserir"):
+            comandos.append((ent["apos_inserir"], registro))
         try:
-            executar(f"INSERT INTO {ent['tabela']} ({colunas}) VALUES ({marcadores})", registro)
+            executar_transacao(comandos)
             flash("Registro cadastrado com sucesso.", "ok")
             return redirect(url_for("listar", nome=nome))
         except sqlite3.Error as e:
             flash(f"Erro do banco: {e}", "erro")
     return render_template("form.html", nome=nome, ent=ent, registro=registro,
-                           opcoes=opcoes_fk(ent), editando=False)
+                           opcoes=opcoes_fk(ent, registro), editando=False)
 
 
 @app.route("/<nome>/<chave>/editar", methods=["GET", "POST"])
@@ -279,8 +323,9 @@ def editar(nome, chave):
     if not ent.get("editavel", True):
         abort(404)
     where, params_pk = filtro_pk(ent, chave)
+    travados = ent["pk"] + ent.get("fixos", [])
     if request.method == "POST":
-        valores = {c: v for c, v in ler_formulario(ent).items() if c not in ent["pk"]}
+        valores = {c: v for c, v in ler_formulario(ent).items() if c not in travados}
         atribuicoes = ", ".join(f"{c} = :{c}" for c in valores)
         try:
             executar(f"UPDATE {ent['tabela']} SET {atribuicoes} WHERE {where}", {**valores, **params_pk})
@@ -288,22 +333,25 @@ def editar(nome, chave):
             return redirect(url_for("listar", nome=nome))
         except sqlite3.Error as e:
             flash(f"Erro do banco: {e}", "erro")
-        registro = {**valores, **{c: params_pk[f"pk_{c}"] for c in ent["pk"]}}
-    else:
-        achados = executar(f"SELECT * FROM {ent['tabela']} WHERE {where}", params_pk, mostrar=False)
-        if not achados:
-            abort(404)
-        registro = achados[0]
+    achados = executar(f"SELECT * FROM {ent['tabela']} WHERE {where}", params_pk, mostrar=False)
+    if not achados:
+        abort(404)
+    registro = achados[0]
+    if request.method == "POST":
+        registro.update(valores)  # mantém o que foi digitado quando dá erro
     return render_template("form.html", nome=nome, ent=ent, registro=registro,
-                           opcoes=opcoes_fk(ent), editando=True)
+                           opcoes=opcoes_fk(ent, registro), editando=True, travados=travados)
 
 
 @app.route("/<nome>/<chave>/excluir", methods=["POST"])
 def excluir(nome, chave):
     ent = get_entidade(nome)
     where, params_pk = filtro_pk(ent, chave)
+    comandos = [(f"DELETE FROM {ent['tabela']} WHERE {where}", params_pk)]
+    if ent.get("antes_excluir"):
+        comandos.insert(0, (ent["antes_excluir"], params_pk))
     try:
-        executar(f"DELETE FROM {ent['tabela']} WHERE {where}", params_pk)
+        executar_transacao(comandos)
         flash("Registro excluído.", "ok")
     except sqlite3.Error as e:
         flash(f"Não foi possível excluir (restrição de integridade): {e}", "erro")

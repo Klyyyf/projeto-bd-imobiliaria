@@ -5,14 +5,15 @@
 <form method="post" class="formulario">
   {% for c in ent.campos %}
     {% set valor = registro.get(c.nome) %}
-    {% set travado = editando and c.nome in ent.pk %}
+    {% set travado = editando and c.nome in travados %}
+    {% set obrigatorio = not c.opcional %}
     <label>
       {% if c.tipo == 'bool' %}
         <span class="check">
           <input type="checkbox" name="{{ c.nome }}" {{ 'checked' if valor }}> {{ c.rotulo }}
         </span>
       {% else %}
-        <span>{{ c.rotulo }} *</span>
+        <span>{{ c.rotulo }}{{ ' *' if obrigatorio }}</span>
         {% if c.tipo == 'select' %}
           <select name="{{ c.nome }}" required>
             <option value="">Selecione...</option>
@@ -21,7 +22,7 @@
             {% endfor %}
           </select>
         {% elif c.tipo == 'fk' %}
-          <select name="{{ c.nome }}" required>
+          <select name="{{ c.nome }}" required {{ 'disabled' if travado }}>
             <option value="">Selecione...</option>
             {% for op in opcoes[c.nome] %}
               <option value="{{ op.valor }}" {{ 'selected' if op.valor|string == valor|string }}>{{ op.rotulo }}</option>
@@ -30,7 +31,7 @@
         {% else %}
           <input type="{{ 'number' if c.tipo in ('int', 'number') else c.tipo }}" name="{{ c.nome }}"
                  value="{{ valor if valor is not none else '' }}"
-                 {{ 'step=0.01' if c.tipo == 'number' }} required {{ 'readonly' if travado }}>
+                 {{ 'step=0.01' if c.tipo == 'number' }} {{ 'required' if obrigatorio }} {{ 'readonly' if travado }}>
         {% endif %}
       {% endif %}
     </label>

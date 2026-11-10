@@ -23,11 +23,13 @@ corretores, imóveis e as vendas intermediadas pelos corretores (com cálculo de
 - **Cliente** (<u>cpf</u>, nome, telefone)
 - **Proprietario** (<u>cpf</u>, nome, telefone)
 - **Corretor** (<u>creci</u>, nome, telefone, avaliador)
-- **Imovel** (<u>id_imovel</u>, tipo, rua, numero, bairro, cidade, cep, preco, cpf_proprietario → Proprietario)
+- **Imovel** (<u>id_imovel</u>, tipo, status, rua, numero, bairro, cidade, cep, preco, cpf_proprietario → Proprietario)
 - **Contrata_o** (<u>cpf_proprietario → Proprietario, creci_corretor → Corretor</u>)
 - **Compra_do** (<u>cpf_cliente → Cliente, creci_corretor → Corretor</u>)
 - **Venda** (<u>id_venda</u>, id_imovel → Imovel, cpf_cliente → Cliente, creci_corretor → Corretor,
   valor_venda, percentual_comissao, comissao)
+- **Visita** (<u>id_visita</u>, id_imovel → Imovel, cpf_cliente → Cliente, creci_corretor → Corretor,
+  data_visita, feedback)
 
 `comissao` é um atributo derivado, calculado pelo próprio banco
 (`GENERATED ALWAYS AS (valor_venda * percentual_comissao / 100.0)`).
@@ -42,7 +44,7 @@ sqlite3 imobiliaria.db < sql/02_povoamento.sql
 sqlite3 imobiliaria.db < sql/03_consultas.sql
 ```
 
-Ou abra o notebook em `notebook/Projeto_BD.ipynb` no Google Colab.
+Ou abra o notebook em `notebook/Projeto_BD_V3.ipynb` no Google Colab.
 
 ## Rodando a aplicação
 
@@ -61,7 +63,9 @@ Na primeira execução o arquivo `app/imobiliaria.db` é criado automaticamente 
 
 ### Funcionalidades
 
-- Cadastro, listagem, edição e exclusão de Clientes, Proprietários, Corretores, Imóveis e Vendas.
+- Cadastro, listagem, edição e exclusão de Clientes, Proprietários, Corretores, Imóveis, Vendas e Visitas.
+- Ao registrar uma venda, o imóvel passa automaticamente para o status `Vendido` (na mesma transação);
+  ao excluir a venda, ele volta a `Disponível`. Só imóveis disponíveis aparecem no cadastro de venda.
 - Cadastro e exclusão das associações Contrata_o (Contratações) e Compra_do (Atendimentos).
 - Cada comando `INSERT`, `UPDATE` ou `DELETE` executado é exibido na tela.
 - Erros de restrição (chave estrangeira, `UNIQUE`, `CHECK`) são mostrados ao usuário — por exemplo,

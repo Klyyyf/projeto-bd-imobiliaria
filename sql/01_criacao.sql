@@ -5,6 +5,7 @@
 
 PRAGMA foreign_keys = ON;
 
+DROP TABLE IF EXISTS Visita;
 DROP TABLE IF EXISTS Venda;
 DROP TABLE IF EXISTS Compra_do;
 DROP TABLE IF EXISTS Contrata_o;
@@ -36,10 +37,11 @@ CREATE TABLE Corretor (
     avaliador INTEGER NOT NULL CHECK (avaliador IN (0, 1))
 );
 
--- Tabela Imóvel (Com endereço composto e restrição de tipos)
+-- Tabela Imóvel (Com endereço composto, restrição de tipos e controle de status)
 CREATE TABLE Imovel (
     id_imovel INTEGER PRIMARY KEY AUTOINCREMENT,
     tipo TEXT NOT NULL CHECK (tipo IN ('Casa', 'Apartamento', 'Escritório', 'Comércio')),
+    status TEXT NOT NULL DEFAULT 'Disponível' CHECK (status IN ('Disponível', 'Reservado', 'Vendido')),
     rua TEXT NOT NULL,
     numero INTEGER NOT NULL,
     bairro TEXT NOT NULL,
@@ -66,6 +68,19 @@ CREATE TABLE Compra_do (
     PRIMARY KEY (cpf_cliente, creci_corretor),
     FOREIGN KEY (cpf_cliente) REFERENCES Cliente(cpf) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (creci_corretor) REFERENCES Corretor(creci) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- Tabela Visita (Registro de visitas de clientes a imóveis, acompanhadas por um corretor)
+CREATE TABLE Visita (
+    id_visita INTEGER PRIMARY KEY AUTOINCREMENT,
+    id_imovel INTEGER NOT NULL,
+    cpf_cliente TEXT NOT NULL,
+    creci_corretor TEXT NOT NULL,
+    data_visita TEXT NOT NULL,
+    feedback TEXT,
+    FOREIGN KEY (id_imovel) REFERENCES Imovel(id_imovel) ON DELETE CASCADE,
+    FOREIGN KEY (cpf_cliente) REFERENCES Cliente(cpf) ON DELETE CASCADE,
+    FOREIGN KEY (creci_corretor) REFERENCES Corretor(creci) ON DELETE CASCADE
 );
 
 -- Tabela Venda (Representa a negociação intermediada)
